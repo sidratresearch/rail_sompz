@@ -1,70 +1,78 @@
-import time
 import datetime
+import time
+from itertools import starmap
+
+import numba
 import numpy as np
 import pandas
 from matplotlib import pyplot as pl
-import  numba
 from tqdm import tqdm
-from itertools import starmap
 
 
 # import cmasher as cmr
 @numba.njit
 def bottleneck(w, vnS):  # pragma: no cover
-            # dn: see Eqn A6 of Sanchez+2020. Appears as asinh nu_{cb}
-            dn = np.arcsinh(vnS)
-            # numerator: see Eqn A6 of Sanchez+2020. Appears as asinh nu_{cb} + w_{ib} log 2 nu_{cb}
-            numerator = dn + w * np.log(2 * vnS)
-            return numerator, dn
+    # dn: see Eqn A6 of Sanchez+2020. Appears as asinh nu_{cb}
+    dn = np.arcsinh(vnS)
+    # numerator: see Eqn A6 of Sanchez+2020. Appears as asinh nu_{cb} + w_{ib} log 2 nu_{cb}
+    numerator = dn + w * np.log(2 * vnS)
+    return numerator, dn
+
 
 def parallel_dsq(vn, s, w, df, h, sPenalty):
-            # vnS is the re-scaled S/N of the cells, shape=(nS,nCells,nTargets,nFeatures)
-            # vnS: see the paragraph containing equation A7 of Sanchez+2020
-            vnS = s*vn
-            numerator, dn = bottleneck(w, vnS)
+    # vnS is the re-scaled S/N of the cells, shape=(nS,nCells,nTargets,nFeatures)
+    # vnS: see the paragraph containing equation A7 of Sanchez+2020
+    vnS = s * vn
+    numerator, dn = bottleneck(w, vnS)
 
-            # dn is the asinh of the cell S/N values
-            ####
-            if np.any(np.isinf(numerator)):  # pragma: no cover
-                #pdb.set_trace()
-                print("inf numerator at", np.where(np.isinf(numerator)))
-                print(np.any(np.isinf(w)),
-                      np.any(np.isinf(vnS)),
-                      np.any(np.isinf(dn)),
-                      np.any(vnS <= 0))
-            if np.any(np.isnan(numerator)):  # pragma: no cover
-                #pdb.set_trace()
-                print("nan numerator at", np.where(np.isnan(numerator)))
-                print(np.any(np.isnan(w)),
-                      np.any(np.isnan(vnS)),
-                      np.any(np.isnan(dn)),
-                      np.any(vnS <= 0))
+    # dn is the asinh of the cell S/N values
+    ####
+    if np.any(np.isinf(numerator)):  # pragma: no cover
+        # pdb.set_trace()
+        print("inf numerator at", np.where(np.isinf(numerator)))
+        print(
+            np.any(np.isinf(w)),
+            np.any(np.isinf(vnS)),
+            np.any(np.isinf(dn)),
+            np.any(vnS <= 0),
+        )
+    if np.any(np.isnan(numerator)):  # pragma: no cover
+        # pdb.set_trace()
+        print("nan numerator at", np.where(np.isnan(numerator)))
+        print(
+            np.any(np.isnan(w)),
+            np.any(np.isnan(vnS)),
+            np.any(np.isnan(dn)),
+            np.any(vnS <= 0),
+        )
 
-            dn = numerator / (1 + w)
-            d = (dn - df) * h
-            dsq0 = np.sum(d * d, axis=3)  # Sum distance over features
-            # Now add penalty for the scaling factor
-            dsq0 +=  sPenalty
-            # Take minimum distance of all scaling factors
-            return np.min(dsq0, axis=0)
+    dn = numerator / (1 + w)
+    d = (dn - df) * h
+    dsq0 = np.sum(d * d, axis=3)  # Sum distance over features
+    # Now add penalty for the scaling factor
+    dsq0 += sPenalty
+    # Take minimum distance of all scaling factors
+    return np.min(dsq0, axis=0)
 
 
 class NoiseSOM:
     """Class to build a SOM that deals with noisy data."""
 
-    def __init__(self,
-                 metric,
-                 data,
-                 errors,
-                 learning,
-                 shape=(32, 32),
-                 minError=0.01,
-                 wrap=False,
-                 logF=True,
-                 initialize='uniform',
-                 gridOverDimensions=None,
-                 pool=None):
-        """ Build a new SOM
+    def __init__(
+        self,
+        metric,
+        data,
+        errors,
+        learning,
+        shape=(32, 32),
+        minError=0.01,
+        wrap=False,
+        logF=True,
+        initialize="uniform",
+        gridOverDimensions=None,
+        pool=None,
+    ):
+        """Build a new SOM
 
         Parameters
         ----------
@@ -124,19 +132,32 @@ class NoiseSOM:
                 if initialize.shape[:-1] == tuple(self.shape):  # pragma: no cover
                     # Copy and flatten the weight array
                     self.weights = np.array(initialize).reshape(-1, self.N)
-                elif len(initialize.shape) == 2 and np.prod(self.shape) == initialize.shape[0]:
+                elif (
+                    len(initialize.shape) == 2
+                    and np.prod(self.shape) == initialize.shape[0]
+                ):
                     # Array is already flattened, just copy it
                     self.weights = np.array(initialize)
                 else:  # pragma: no cover
-                    raise ValueError('Wrong shape for initialize ndarray', initialize.shape, self.shape)
-                if self.logF and np.min(self.weights.flatten()) <= 0:  # pragma: no cover
+                    raise ValueError(
+                        "Wrong shape for initialize ndarray",
+                        initialize.shape,
+                        self.shape,
+                    )
+                if (
+                    self.logF and np.min(self.weights.flatten()) <= 0
+                ):  # pragma: no cover
                     # Cannot deal with negative weights in a log SOM:
-                    raise ValueError('Non-positive feature in initialization of ' +
-                                     'log-domain NoiseSOM')
+                    raise ValueError(
+                        "Non-positive feature in initialization of "
+                        + "log-domain NoiseSOM"
+                    )
                 return  # No training needed
             else:  # pragma: no cover
                 # Failure if there is no initial weight vector given.
-                raise ValueError('Neither training data nor weight matrix given for NoiseSOM')
+                raise ValueError(
+                    "Neither training data nor weight matrix given for NoiseSOM"
+                )
 
         # Train the SOM using data
 
@@ -160,17 +181,18 @@ class NoiseSOM:
             maxF = np.max(data, axis=0)
 
         nCells = np.prod(shape)
-        if initialize == 'uniform':
+        if initialize == "uniform":
             # Populate weights with random numbers
             self.weights = np.random.rand(nCells, self.N)
             self.weights = minF + (maxF - minF) * self.weights
             if self.logF:  # pragma: no cover
                 # Put weights back into linear form
                 self.weights = np.exp(self.weights)
-        elif initialize == 'sample':  # pragma: no cover
+        elif initialize == "sample":  # pragma: no cover
             # Populate weights with a random sample from the data
-            indices = np.random.choice(data.shape[0], size=self.shape,
-                                       replace=False).flatten()
+            indices = np.random.choice(
+                data.shape[0], size=self.shape, replace=False
+            ).flatten()
             if logF:
                 # Allow no negatives - lower bound at 1-sigma
                 self.weights = np.maximum(data[indices, :], errors[indices, :])
@@ -181,29 +203,43 @@ class NoiseSOM:
             if initialize.shape == tuple(self.shape) + (self.N,):
                 # Copy and flatten the weight array
                 self.weights = np.array(initialize).reshape(-1, self.N)
-            elif len(initialize.shape) == 2 and np.prod(self.shape) == initialize.shape[0]:
+            elif (
+                len(initialize.shape) == 2
+                and np.prod(self.shape) == initialize.shape[0]
+            ):
                 # Array is already flattened, just copy it
                 self.weights = np.array(initialize)
             else:
-                raise ValueError('Wrong shape for initialize ndarray', initialize.shape)
+                raise ValueError("Wrong shape for initialize ndarray", initialize.shape)
             if self.logF and np.min(self.weights.flatten()) <= 0:
-                raise ValueError('Non-positive feature in initialization of ' +
-                                 'log-domain NoiseSOM')
+                raise ValueError(
+                    "Non-positive feature in initialization of " + "log-domain NoiseSOM"
+                )
         else:  # pragma: no cover
-            raise ValueError('Invalid initialize: ' + str(initialize))
+            raise ValueError("Invalid initialize: " + str(initialize))
 
         if gridOverDimensions is not None:  # pragma: no cover
             # Place the initial weights in a grid over some dimensions
-            if len(gridOverDimensions) != len(self.shape) or np.min(gridOverDimensions) < 0 or np.max(
-                    gridOverDimensions) >= len(self.shape):
-                print("NoiseSOM requested grid over", gridOverDimensions,
-                      "does not match dimensions of SOM", self.shape)
+            if (
+                len(gridOverDimensions) != len(self.shape)
+                or np.min(gridOverDimensions) < 0
+                or np.max(gridOverDimensions) >= len(self.shape)
+            ):
+                print(
+                    "NoiseSOM requested grid over",
+                    gridOverDimensions,
+                    "does not match dimensions of SOM",
+                    self.shape,
+                )
                 raise TypeError
-            indices = np.unravel_index(np.arange(self.weights.shape[0]),
-                                       [self.shape[i] for i in gridOverDimensions])
+            indices = np.unravel_index(
+                np.arange(self.weights.shape[0]),
+                [self.shape[i] for i in gridOverDimensions],
+            )
             for i, j in enumerate(gridOverDimensions):
-                self.weights[:, j] = minF[j] + \
-                                     (0.5 + indices[i]) * ((maxF[j] - minF[j]) / self.shape[j])
+                self.weights[:, j] = minF[j] + (0.5 + indices[i]) * (
+                    (maxF[j] - minF[j]) / self.shape[j]
+                )
                 if self.logF:
                     self.weights[:, j] = np.exp(self.weights[:, j])
 
@@ -218,10 +254,10 @@ class NoiseSOM:
         np.random.shuffle(order)
 
         # Training loop
-        #t0 = time.time()
+        # t0 = time.time()
         minLearn = 0.001  # Don't update cells whose learning function is below this
         for i in tqdm(range(nTrain)):
-            #if i % 10000 == 0:
+            # if i % 10000 == 0:
             #    print('Training', i)
             # Calculate p , get BMU
             dd = data[order[i]]
@@ -229,7 +265,9 @@ class NoiseSOM:
             bmu = self.getBMU(dd, err, pool)
 
             # Get the learning function values
-            fLearn = learning(xy, shape=self.shape, wrap=self.wrap, bmu=bmu, iteration=i)
+            fLearn = learning(
+                xy, shape=self.shape, wrap=self.wrap, bmu=bmu, iteration=i
+            )
 
             # At this point mask to only cells that will learn something
             use = fLearn >= minLearn
@@ -278,9 +316,9 @@ class NoiseSOM:
             dsq[first:last] = d[bb, np.arange(d.shape[1])]
         return bmu, dsq
 
-    def fuzzyProb(self, fluxes, invVars,
-                  scale=None, sPenalty=None,
-                  maxScale=False):  # pragma: no cover
+    def fuzzyProb(
+        self, fluxes, invVars, scale=None, sPenalty=None, maxScale=False
+    ):  # pragma: no cover
         """
         Calculate the relative probability of obtaining the `fluxes` given the
         SOM cell fluxes, assuming Gaussian errors on each feature with
@@ -311,14 +349,24 @@ class NoiseSOM:
             last = min(fluxes.shape[0], first + chunk)
             ss = slice(first, last)
             if first % 1024 == 0:
-                print('Doing', first)
+                print("Doing", first)
             # Contract sums over feature dimensions
-            snn = np.einsum('ik,ik,jk->ij', self.weights, self.weights, invVars[ss], optimize=True)
-            snt = np.einsum('ik,jk,jk->ij', self.weights, fluxes[ss], invVars[ss], optimize=True)
-            stt = np.einsum('jk,jk,jk->j', fluxes[ss], fluxes[ss], invVars[ss], optimize=True)
+            snn = np.einsum(
+                "ik,ik,jk->ij", self.weights, self.weights, invVars[ss], optimize=True
+            )
+            snt = np.einsum(
+                "ik,jk,jk->ij", self.weights, fluxes[ss], invVars[ss], optimize=True
+            )
+            stt = np.einsum(
+                "jk,jk,jk->j", fluxes[ss], fluxes[ss], invVars[ss], optimize=True
+            )
             # Construct chisq as function of s
-            chisq = stt[np.newaxis, :, np.newaxis] - (2 * scale) * snt[:, :, np.newaxis] \
-                    + snn[:, :, np.newaxis] * (scale * scale) + sPenalty
+            chisq = (
+                stt[np.newaxis, :, np.newaxis]
+                - (2 * scale) * snt[:, :, np.newaxis]
+                + snn[:, :, np.newaxis] * (scale * scale)
+                + sPenalty
+            )
             # To avoid underflows, take out min chisq for each target
             chisq0 = np.min(np.min(chisq, axis=2), axis=0)
             chisq -= chisq0[np.newaxis, :, np.newaxis]
@@ -337,7 +385,7 @@ class hFunc:
     An implementation of a SOM learning function as given by Speagle
     """
 
-    def __init__(self, nTrain, a=(0.5, 0.1), sigma=(10., 1.)):
+    def __init__(self, nTrain, a=(0.5, 0.1), sigma=(10.0, 1.0)):
         self.nTrain = float(nTrain)
         self.a = a
         self.sigma = sigma
@@ -348,15 +396,15 @@ class hFunc:
         Return array of learning weights (0<=wt<=1) for each cell
         """
         f = iteration / self.nTrain
-        aFactor = 1. / ((1. - f) / self.a[0] + f / self.a[1])
-        invS = ((1. - f) / self.sigma[0] + f / self.sigma[1]) ** 2
+        aFactor = 1.0 / ((1.0 - f) / self.a[0] + f / self.a[1])
+        invS = ((1.0 - f) / self.sigma[0] + f / self.sigma[1]) ** 2
         dxy = xy - np.unravel_index(bmu, shape)
         if wrap:  # pragma: no cover
             dxy = np.remainder(dxy + shape // 2, shape) - shape // 2
         return aFactor * np.exp(-0.5 * np.sum(dxy * dxy, axis=1) * invS)
 
 
-'''
+"""
  Define a metric interface as having two calls
  `Metric(cell_features, target_features, target_errors)`  which returns an
     nCells x nTargets matrix giving in element (i,j) the
@@ -366,7 +414,7 @@ class hFunc:
  `Metric.update(cells, fractions, features, errors)` updates the nCells x nFeatures `cells` array
      to move `fractions` of the way to the `features`, where `fractions` has shape (nCells,) of
      values between 0 and 1.  The new nodal features must remain positive.
-'''
+"""
 
 
 class AsinhMetric:
@@ -374,7 +422,7 @@ class AsinhMetric:
     Class meeting the metric interface which does a good job
     of being linear at low S/N, log at high S/N for data"""
 
-    def __init__(self, lnScaleSigma=0.4, lnScaleStep=0.02, maxSigma=3.):
+    def __init__(self, lnScaleSigma=0.4, lnScaleStep=0.02, maxSigma=3.0):
         """Create a distance metric between scale-smeared cells and some features
 
         Parameters
@@ -391,7 +439,7 @@ class AsinhMetric:
         lnScaleStep
             step size in ln(scale) used when integrating over scale
         """
-        if lnScaleSigma > 0.:
+        if lnScaleSigma > 0.0:
             # Create an array of scale factors (s) and distance-sq (sPenalty) to the
             # center of the fuzzy template
             # nS is the number of scale factors
@@ -402,16 +450,18 @@ class AsinhMetric:
             self.sPenalty = (lnS / lnScaleSigma) ** 2
         else:  # pragma: no cover
             self.s = np.ones(1, dtype=float)
-            self.sPenalty = self.s * 0.
+            self.sPenalty = self.s * 0.0
         return
 
     def __call__(self, cells, features, errors, pool=None):
         if len(cells.shape) != 2:  # pragma: no cover
-            raise ValueError('Metric cells is wrong dimension')
+            raise ValueError("Metric cells is wrong dimension")
         if features.shape != errors.shape:  # pragma: no cover
-            raise ValueError('Metric features and errors do not match')
+            raise ValueError("Metric features and errors do not match")
         if cells.shape[-1] != features.shape[-1]:  # pragma: no cover
-            raise ValueError('Metric cells and features have mismatched no. of features')
+            raise ValueError(
+                "Metric cells and features have mismatched no. of features"
+            )
         if len(features.shape) == 1:
             vf = (features / errors).reshape(1, features.shape[0])
             ee = errors.reshape(vf.shape)
@@ -423,12 +473,11 @@ class AsinhMetric:
             ee = errors
 
         else:  # pragma: no cover
-            raise ValueError('Metric features has invalid dimensions')
+            raise ValueError("Metric features has invalid dimensions")
 
         # vn is the S/N of the cells, with shape (nCells, nTargets, nFeatures)
         # vn: see Eqn A4 of Sanchez+2020
         vn = cells[:, np.newaxis, :] / ee[np.newaxis, :, :]
-
 
         # Here is our rescaling function:
         # sum = np.zeros((vn.shape[0], vn.shape[1]), dtype=float)
@@ -449,19 +498,19 @@ class AsinhMetric:
 
         # w is the weight for asinh vs geometric mean metrics
         # w: see Eqn A5 of Sanchez+2020
-        w = np.minimum(np.exp(2 * (vf - 4)), 1000.)
+        w = np.minimum(np.exp(2 * (vf - 4)), 1000.0)
         if np.any(np.isinf(w)):  # pragma: no cover
-            #pdb.set_trace()
-            print('inf in w at', np.where(np.isinf(w)))
+            # pdb.set_trace()
+            print("inf in w at", np.where(np.isinf(w)))
         if np.any(np.isnan(w)):  # pragma: no cover
-            #pdb.set_trace()
-            print('nan in w at', np.where(np.isnan(w)))
+            # pdb.set_trace()
+            print("nan in w at", np.where(np.isnan(w)))
 
         # h: see Eqn A6 of Sanchez+2020. Appears as (1+nu_{ib}^2)
         h = np.hypot(1, vf)
         s = self.s[:, np.newaxis, np.newaxis, np.newaxis]
         sPenalty = self.sPenalty[:, np.newaxis, np.newaxis]
-        vnlist =  np.array_split(vn, chunk)
+        vnlist = np.array_split(vn, chunk)
         args = [(_, s, w, df, h, sPenalty) for _ in vnlist]
         if pool is not None:
             dsq_list = pool[0].starmap(parallel_dsq, args)
@@ -471,29 +520,33 @@ class AsinhMetric:
 
         return dsq
 
-    def update(self, cells, fractions, features, errors, threshold=2.):
-        '''
+    def update(self, cells, fractions, features, errors, threshold=2.0):
+        """
         threshold: minimum S/N for a modification of SOM cell weights. Default value is arbitrary.
-        '''
+        """
         if len(cells.shape) != 2:  # pragma: no cover
-            raise ValueError('Metric cells is wrong dimension')
-        if len(fractions.shape) != 1 or fractions.shape[0] != cells.shape[0]:  # pragma: no cover
-            raise ValueError('Metric fractions array is wrong shape')
+            raise ValueError("Metric cells is wrong dimension")
+        if (
+            len(fractions.shape) != 1 or fractions.shape[0] != cells.shape[0]
+        ):  # pragma: no cover
+            raise ValueError("Metric fractions array is wrong shape")
         if len(features.shape) > 1:  # pragma: no cover
-            raise ValueError('Metric gradient only works for single feature vector')
+            raise ValueError("Metric gradient only works for single feature vector")
         if features.shape != errors.shape:  # pragma: no cover
-            raise ValueError('Metric features and errors do not match')
+            raise ValueError("Metric features and errors do not match")
         if cells.shape[-1] != features.shape[-1]:  # pragma: no cover
-            raise ValueError('Metric cells and features have mismatched no. of features')
+            raise ValueError(
+                "Metric cells and features have mismatched no. of features"
+            )
 
         # Write just an unscaled version first
         vf = features / errors
         vn = cells / errors
 
-        factor = np.maximum(1., vf) / vn
+        factor = np.maximum(1.0, vf) / vn
         # Don't move if there's no information at all
         lowSN = np.maximum(vn, vf) < threshold
-        factor[lowSN] = 1.
+        factor[lowSN] = 1.0
 
         cells *= np.power(factor, fractions[:, np.newaxis])
         return
@@ -529,11 +582,13 @@ class LinearMetric:  # pragma: no cover
 
     def __call__(self, cells, features, errors):
         if len(cells.shape) != 2:
-            raise ValueError('Metric cells is wrong dimension')
+            raise ValueError("Metric cells is wrong dimension")
         if features.shape != errors.shape:
-            raise ValueError('Metric features and errors do not match')
+            raise ValueError("Metric features and errors do not match")
         if cells.shape[-1] != features.shape[-1]:
-            raise ValueError('Metric cells and features have mismatched no. of features')
+            raise ValueError(
+                "Metric cells and features have mismatched no. of features"
+            )
         if len(features.shape) == 1:
             vf = (features / errors).reshape(1, features.shape[0])
             ee = errors.reshape(1, features.shape[0])
@@ -542,7 +597,7 @@ class LinearMetric:  # pragma: no cover
             ee = errors
             # vf is S/N of the features, with shape (nTargets,nFeatures)
         else:
-            raise ValueError('Metric features has invalid dimensions')
+            raise ValueError("Metric features has invalid dimensions")
         vn = cells[:, np.newaxis, :] / ee[np.newaxis, :, :]
         # And vn is cell S/N with shape (nCells,nTargets, nFeatures)
 
@@ -552,15 +607,17 @@ class LinearMetric:  # pragma: no cover
 
     def update(self, cells, fractions, features, errors):
         if len(cells.shape) != 2:
-            raise ValueError('Metric cells is wrong dimension')
+            raise ValueError("Metric cells is wrong dimension")
         if len(fractions.shape) != 1 or fractions.shape[0] != cells.shape[0]:
-            raise ValueError('Metric fractions array is wrong shape')
+            raise ValueError("Metric fractions array is wrong shape")
         if len(features.shape) > 1:
-            raise ValueError('Metric gradient only works for single feature vector')
+            raise ValueError("Metric gradient only works for single feature vector")
         if features.shape != errors.shape:
-            raise ValueError('Metric features and errors do not match')
+            raise ValueError("Metric features and errors do not match")
         if cells.shape[-1] != features.shape[-1]:
-            raise ValueError('Metric cells and features have mismatched no. of features')
+            raise ValueError(
+                "Metric cells and features have mismatched no. of features"
+            )
 
         # The shift is just difference scaled by fractions and
         # any suppression factor
@@ -587,31 +644,40 @@ def readCOSMOS():  # pragma: no cover
     and radec array.
     """
     # Read the master file.  Mag zeropoints are all 30.0
-    cosmos = pandas.read_hdf('cosmos.hdf5', 'fluxes')
+    cosmos = pandas.read_hdf("cosmos.hdf5", "fluxes")
 
     # Pull out numpy arrays for our quantities of interest
-    fluxes = np.vstack([cosmos['BDF_FLUX_DERED_U'],
-                        cosmos['BDF_FLUX_DERED_G'],
-                        cosmos['BDF_FLUX_DERED_R'],
-                        cosmos['BDF_FLUX_DERED_I'],
-                        cosmos['BDF_FLUX_DERED_Z'],
-                        cosmos['BDF_FLUX_DERED_J'],
-                        cosmos['BDF_FLUX_DERED_H'],
-                        cosmos['BDF_FLUX_DERED_K']]).transpose()
-    errors = np.vstack([cosmos['BDF_FLUX_ERR_DERED_U'],
-                        cosmos['BDF_FLUX_ERR_DERED_G'],
-                        cosmos['BDF_FLUX_ERR_DERED_R'],
-                        cosmos['BDF_FLUX_ERR_DERED_I'],
-                        cosmos['BDF_FLUX_ERR_DERED_Z'],
-                        cosmos['BDF_FLUX_ERR_DERED_J'],
-                        cosmos['BDF_FLUX_ERR_DERED_H'],
-                        cosmos['BDF_FLUX_ERR_DERED_K']]).transpose()
-    redshifts = np.array(cosmos['Z'])
-    radec = np.vstack([cosmos['RA'],
-                       cosmos['DEC']]).transpose()
+    fluxes = np.vstack(
+        [
+            cosmos["BDF_FLUX_DERED_U"],
+            cosmos["BDF_FLUX_DERED_G"],
+            cosmos["BDF_FLUX_DERED_R"],
+            cosmos["BDF_FLUX_DERED_I"],
+            cosmos["BDF_FLUX_DERED_Z"],
+            cosmos["BDF_FLUX_DERED_J"],
+            cosmos["BDF_FLUX_DERED_H"],
+            cosmos["BDF_FLUX_DERED_K"],
+        ]
+    ).transpose()
+    errors = np.vstack(
+        [
+            cosmos["BDF_FLUX_ERR_DERED_U"],
+            cosmos["BDF_FLUX_ERR_DERED_G"],
+            cosmos["BDF_FLUX_ERR_DERED_R"],
+            cosmos["BDF_FLUX_ERR_DERED_I"],
+            cosmos["BDF_FLUX_ERR_DERED_Z"],
+            cosmos["BDF_FLUX_ERR_DERED_J"],
+            cosmos["BDF_FLUX_ERR_DERED_H"],
+            cosmos["BDF_FLUX_ERR_DERED_K"],
+        ]
+    ).transpose()
+    redshifts = np.array(cosmos["Z"])
+    radec = np.vstack([cosmos["RA"], cosmos["DEC"]]).transpose()
 
     # Reduce to the unique COSMOS objects, keep track of number of Balrog detections
-    junk, indices, counts = np.unique(fluxes[:, 0], return_index=True, return_counts=True)
+    junk, indices, counts = np.unique(
+        fluxes[:, 0], return_index=True, return_counts=True
+    )
     fluxes = fluxes[indices]
     errors = errors[indices]
     redshifts = redshifts[indices]
@@ -619,105 +685,130 @@ def readCOSMOS():  # pragma: no cover
     return fluxes, errors, redshifts, counts, radec
 
 
-def somPlot3d(som, az=200., el=30.):  # pragma: no cover
+def somPlot3d(som, az=200.0, el=30.0):  # pragma: no cover
     # Make a 3d plot of cells weights in color space.  az/el are plot view angle
-    mags = 30. - 2.5 * np.log10(som.weights)
+    mags = 30.0 - 2.5 * np.log10(som.weights)
     ug = mags[:, 0] - mags[:, 1]
     gi = mags[:, 1] - mags[:, 3]
     ik = mags[:, 3] - mags[:, 7]
     imag = mags[:, 3]
     fig = pl.figure(figsize=(6, 6))
-    ax = fig.add_subplot(111, projection='3d')
+    ax = fig.add_subplot(111, projection="3d")
     ax.azim = az
     ax.elev = el
-    ax.scatter(gi, ik, imag, c=ug, cmap='Spectral_r')
+    ax.scatter(gi, ik, imag, c=ug, cmap="Spectral_r")
     # Draw the outline of the SOM edges
     xx = np.arange(som.shape[0], dtype=int)
     yy = np.arange(som.shape[1], dtype=int)
-    xxx = np.hstack((xx,
-                     np.ones(len(yy) - 2, dtype=int) * xx[-1],
-                     xx[::-1],
-                     np.zeros(len(yy) - 1, dtype=int)))
-    yyy = np.hstack((np.zeros(len(xx), dtype=int),
-                     yy[1:-1],
-                     np.ones(len(xx) - 1, dtype=int) * yy[-1],
-                     yy[-1::-1]))
+    xxx = np.hstack(
+        (
+            xx,
+            np.ones(len(yy) - 2, dtype=int) * xx[-1],
+            xx[::-1],
+            np.zeros(len(yy) - 1, dtype=int),
+        )
+    )
+    yyy = np.hstack(
+        (
+            np.zeros(len(xx), dtype=int),
+            yy[1:-1],
+            np.ones(len(xx) - 1, dtype=int) * yy[-1],
+            yy[-1::-1],
+        )
+    )
     ii = np.ravel_multi_index((xxx, yyy), som.shape)
-    ax.plot(gi[ii], ik[ii], imag[ii], 'k--')
-    ax.set_title('Node locations')
-    ax.set_aspect('equal')
-    ax.set_xlabel('gi')
-    ax.set_ylabel('ik')
-    ax.set_zlabel('imag')
+    ax.plot(gi[ii], ik[ii], imag[ii], "k--")
+    ax.set_title("Node locations")
+    ax.set_aspect("equal")
+    ax.set_xlabel("gi")
+    ax.set_ylabel("ik")
+    ax.set_zlabel("imag")
     return
 
 
 def somPlot2d(som):  # pragma: no cover
     # Make a 2d plot of cells weights in color-color diagram space.
-    mags = 30. - 2.5 * np.log10(som.weights)
+    mags = 30.0 - 2.5 * np.log10(som.weights)
     ug = mags[:, 0] - mags[:, 1]
     gi = mags[:, 1] - mags[:, 3]
     ik = mags[:, 3] - mags[:, 7]
     imag = mags[:, 3]
     fig = pl.figure(figsize=(6, 7))
     # First a color-color plot of nodes
-    pl.scatter(gi, ik, c=imag, alpha=0.3, cmap='Spectral')
+    pl.scatter(gi, ik, c=imag, alpha=0.3, cmap="Spectral")
     # Draw the outline of the SOM edges
     xx = np.arange(som.shape[0], dtype=int)
     yy = np.arange(som.shape[1], dtype=int)
-    xxx = np.hstack((xx,
-                     np.ones(len(yy) - 2, dtype=int) * xx[-1],
-                     xx[::-1],
-                     np.zeros(len(yy) - 1, dtype=int)))
-    yyy = np.hstack((np.zeros(len(xx), dtype=int),
-                     yy[1:-1],
-                     np.ones(len(xx) - 1, dtype=int) * yy[-1],
-                     yy[-1::-1]))
+    xxx = np.hstack(
+        (
+            xx,
+            np.ones(len(yy) - 2, dtype=int) * xx[-1],
+            xx[::-1],
+            np.zeros(len(yy) - 1, dtype=int),
+        )
+    )
+    yyy = np.hstack(
+        (
+            np.zeros(len(xx), dtype=int),
+            yy[1:-1],
+            np.ones(len(xx) - 1, dtype=int) * yy[-1],
+            yy[-1::-1],
+        )
+    )
     ii = np.ravel_multi_index((xxx, yyy), som.shape)
-    pl.plot(gi[ii], ik[ii], 'k-')
-    pl.title('Node locations')
-    pl.gca().set_aspect('equal')
+    pl.plot(gi[ii], ik[ii], "k-")
+    pl.title("Node locations")
+    pl.gca().set_aspect("equal")
     cb = pl.colorbar()
-    cb.set_label('imag')
-    pl.xlabel('gi')
-    pl.ylabel('ik')
+    cb.set_label("imag")
+    pl.xlabel("gi")
+    pl.ylabel("ik")
     return
 
 
 def somPlot2dnok(som):  # pragma: no cover
     # Make a 2d plot of cells weights in color-color diagram space.
-    mags = 30. - 2.5 * np.log10(som.weights)
+    mags = 30.0 - 2.5 * np.log10(som.weights)
     ug = mags[:, 0] - mags[:, 1]
     gi = mags[:, 1] - mags[:, 3]
     iy = mags[:, 3] - mags[:, 5]
     imag = mags[:, 3]
     fig = pl.figure(figsize=(10, 8))
     # First a color-color plot of nodes
-    pl.scatter(gi, iy, c=imag, alpha=0.3, cmap='Spectral')
+    pl.scatter(gi, iy, c=imag, alpha=0.3, cmap="Spectral")
     # Draw the outline of the SOM edges
     xx = np.arange(som.shape[0], dtype=int)
     yy = np.arange(som.shape[1], dtype=int)
-    xxx = np.hstack((xx,
-                     np.ones(len(yy) - 2, dtype=int) * xx[-1],
-                     xx[::-1],
-                     np.zeros(len(yy) - 1, dtype=int)))
-    yyy = np.hstack((np.zeros(len(xx), dtype=int),
-                     yy[1:-1],
-                     np.ones(len(xx) - 1, dtype=int) * yy[-1],
-                     yy[-1::-1]))
+    xxx = np.hstack(
+        (
+            xx,
+            np.ones(len(yy) - 2, dtype=int) * xx[-1],
+            xx[::-1],
+            np.zeros(len(yy) - 1, dtype=int),
+        )
+    )
+    yyy = np.hstack(
+        (
+            np.zeros(len(xx), dtype=int),
+            yy[1:-1],
+            np.ones(len(xx) - 1, dtype=int) * yy[-1],
+            yy[-1::-1],
+        )
+    )
     ii = np.ravel_multi_index((xxx, yyy), som.shape)
-    pl.plot(gi[ii], iy[ii], 'k-')
-    pl.title('Node locations')
-    pl.gca().set_aspect('equal')
+    pl.plot(gi[ii], iy[ii], "k-")
+    pl.title("Node locations")
+    pl.gca().set_aspect("equal")
     cb = pl.colorbar()
-    cb.set_label('imag')
-    pl.xlabel('gi')
-    pl.ylabel('iy')
+    cb.set_label("imag")
+    pl.xlabel("gi")
+    pl.ylabel("iy")
     return
+
 
 def somDomainColors(som):  # pragma: no cover
     # Make 4-panel plot colors and mag across SOM space
-    mags = 30. - 2.5 * np.log10(som.weights)
+    mags = 30.0 - 2.5 * np.log10(som.weights)
     ug = mags[:, 0] - mags[:, 1]
     gi = mags[:, 1] - mags[:, 3]
     ik = mags[:, 3] - mags[:, 7]
@@ -725,34 +816,51 @@ def somDomainColors(som):  # pragma: no cover
     fig = pl.figure(figsize=(6, 7))
 
     fig, ax = pl.subplots(nrows=2, ncols=2, figsize=(8, 8))
-    im = ax[0, 0].imshow(gi.reshape(som.shape), interpolation='nearest', origin='lower',
-                         cmap='Spectral_r')
-    ax[0, 0].set_title('gi')
-    ax[0, 0].set_aspect('equal')
+    im = ax[0, 0].imshow(
+        gi.reshape(som.shape),
+        interpolation="nearest",
+        origin="lower",
+        cmap="Spectral_r",
+    )
+    ax[0, 0].set_title("gi")
+    ax[0, 0].set_aspect("equal")
     pl.colorbar(im, ax=ax[0, 0])
 
-    im = ax[1, 0].imshow(ug.reshape(som.shape), interpolation='nearest', origin='lower',
-                         cmap='Spectral_r')
-    ax[1, 0].set_title('ug')
-    ax[1, 0].set_aspect('equal')
+    im = ax[1, 0].imshow(
+        ug.reshape(som.shape),
+        interpolation="nearest",
+        origin="lower",
+        cmap="Spectral_r",
+    )
+    ax[1, 0].set_title("ug")
+    ax[1, 0].set_aspect("equal")
     pl.colorbar(im, ax=ax[1, 0])
 
-    im = ax[0, 1].imshow(ik.reshape(som.shape), interpolation='nearest', origin='lower',
-                         cmap='Spectral_r')
-    ax[0, 1].set_title('ik')
-    ax[0, 1].set_aspect('equal')
+    im = ax[0, 1].imshow(
+        ik.reshape(som.shape),
+        interpolation="nearest",
+        origin="lower",
+        cmap="Spectral_r",
+    )
+    ax[0, 1].set_title("ik")
+    ax[0, 1].set_aspect("equal")
     pl.colorbar(im, ax=ax[0, 1])
 
-    im = ax[1, 1].imshow(imag.reshape(som.shape), interpolation='nearest', origin='lower',
-                         cmap='Spectral')
-    ax[1, 1].set_title('imag')
-    ax[1, 1].set_aspect('equal')
+    im = ax[1, 1].imshow(
+        imag.reshape(som.shape),
+        interpolation="nearest",
+        origin="lower",
+        cmap="Spectral",
+    )
+    ax[1, 1].set_title("imag")
+    ax[1, 1].set_aspect("equal")
     pl.colorbar(im, ax=ax[1, 1])
     return
 
+
 def somDomainColorsnok(som):  # pragma: no cover
     # Make 4-panel plot colors and mag across SOM space
-    mags = 30. - 2.5 * np.log10(som.weights)
+    mags = 30.0 - 2.5 * np.log10(som.weights)
     ug = mags[:, 0] - mags[:, 1]
     gi = mags[:, 1] - mags[:, 3]
     iy = mags[:, 3] - mags[:, 5]
@@ -760,82 +868,127 @@ def somDomainColorsnok(som):  # pragma: no cover
     fig = pl.figure(figsize=(10, 9))
 
     fig, ax = pl.subplots(nrows=2, ncols=2, figsize=(8, 8))
-    im = ax[0, 0].imshow(gi.reshape(som.shape), interpolation='nearest', origin='lower',
-                         cmap='Spectral_r')
-    ax[0, 0].set_title('gi')
-    ax[0, 0].set_aspect('equal')
+    im = ax[0, 0].imshow(
+        gi.reshape(som.shape),
+        interpolation="nearest",
+        origin="lower",
+        cmap="Spectral_r",
+    )
+    ax[0, 0].set_title("gi")
+    ax[0, 0].set_aspect("equal")
     pl.colorbar(im, ax=ax[0, 0])
 
-    im = ax[1, 0].imshow(ug.reshape(som.shape), interpolation='nearest', origin='lower',
-                         cmap='Spectral_r')
-    ax[1, 0].set_title('ug')
-    ax[1, 0].set_aspect('equal')
+    im = ax[1, 0].imshow(
+        ug.reshape(som.shape),
+        interpolation="nearest",
+        origin="lower",
+        cmap="Spectral_r",
+    )
+    ax[1, 0].set_title("ug")
+    ax[1, 0].set_aspect("equal")
     pl.colorbar(im, ax=ax[1, 0])
 
-    im = ax[0, 1].imshow(iy.reshape(som.shape), interpolation='nearest', origin='lower',
-                         cmap='Spectral_r')
-    ax[0, 1].set_title('iy')
-    ax[0, 1].set_aspect('equal')
+    im = ax[0, 1].imshow(
+        iy.reshape(som.shape),
+        interpolation="nearest",
+        origin="lower",
+        cmap="Spectral_r",
+    )
+    ax[0, 1].set_title("iy")
+    ax[0, 1].set_aspect("equal")
     pl.colorbar(im, ax=ax[0, 1])
 
-    im = ax[1, 1].imshow(imag.reshape(som.shape), interpolation='nearest', origin='lower',
-                         cmap='Spectral')
-    ax[1, 1].set_title('imag')
-    ax[1, 1].set_aspect('equal')
+    im = ax[1, 1].imshow(
+        imag.reshape(som.shape),
+        interpolation="nearest",
+        origin="lower",
+        cmap="Spectral",
+    )
+    ax[1, 1].set_title("imag")
+    ax[1, 1].set_aspect("equal")
     pl.colorbar(im, ax=ax[1, 1])
     return
 
 
 def plotSOMz(som, cells, zz, subsamp=1, figsize=(8, 8)):  # pragma: no cover
     """Make 4-panel plot showing occupancy of SOM by a redshift sample and statistics
-       of redshift distribution in each cell."""
+    of redshift distribution in each cell."""
     nbins = np.prod(som.shape)
     nn = np.histogram(cells, bins=nbins, range=(-0.5, nbins - 0.5))[0]
-    zmean = np.histogram(cells, bins=nbins, range=(-0.5, nbins - 0.5), weights=zz[::subsamp])[0] / nn
-    zvar = np.histogram(cells, bins=nbins, range=(-0.5, nbins - 0.5), weights=(zz * zz)[::subsamp])[0] / nn
+    zmean = (
+        np.histogram(
+            cells, bins=nbins, range=(-0.5, nbins - 0.5), weights=zz[::subsamp]
+        )[0]
+        / nn
+    )
+    zvar = (
+        np.histogram(
+            cells, bins=nbins, range=(-0.5, nbins - 0.5), weights=(zz * zz)[::subsamp]
+        )[0]
+        / nn
+    )
     zrms = np.sqrt(zvar - zmean * zmean)
     zmed = np.array([np.median(zz[cells == i]) for i in range(nbins)])
 
     fig, ax = pl.subplots(nrows=2, ncols=2, figsize=figsize)
 
-    im = ax[0, 0].imshow(np.log10(nn.reshape(som.shape)), interpolation='nearest', origin='lower')  # ,
+    im = ax[0, 0].imshow(
+        np.log10(nn.reshape(som.shape)), interpolation="nearest", origin="lower"
+    )  # ,
     # cmap=cmr.heat)
-    ax[0, 0].set_aspect('equal')
-    ax[0, 0].set_title('Sources per cell')
+    ax[0, 0].set_aspect("equal")
+    ax[0, 0].set_title("Sources per cell")
     pl.colorbar(im, ax=ax[0, 0])
 
     useful = nn > 4
-    im = ax[0, 1].imshow(zmed.reshape(som.shape), interpolation='nearest', origin='lower',
-                         vmax=2.5, vmin=0., cmap='Spectral')
-    ax[0, 1].set_aspect('equal')
-    ax[0, 1].set_title('z_median')
+    im = ax[0, 1].imshow(
+        zmed.reshape(som.shape),
+        interpolation="nearest",
+        origin="lower",
+        vmax=2.5,
+        vmin=0.0,
+        cmap="Spectral",
+    )
+    ax[0, 1].set_aspect("equal")
+    ax[0, 1].set_title("z_median")
     pl.colorbar(im, ax=ax[0, 1])
 
-    im = ax[1, 0].imshow((zrms / (1 + zmed)).reshape(som.shape), interpolation='nearest', origin='lower',
-                         cmap='Spectral')
-    ax[1, 0].set_aspect('equal')
-    ax[1, 0].set_title('std(z)/(1+zmed)')
+    im = ax[1, 0].imshow(
+        (zrms / (1 + zmed)).reshape(som.shape),
+        interpolation="nearest",
+        origin="lower",
+        cmap="Spectral",
+    )
+    ax[1, 0].set_aspect("equal")
+    ax[1, 0].set_title("std(z)/(1+zmed)")
     pl.colorbar(im, ax=ax[1, 0])
 
-    print('Median sig(ln(z)):', np.median((zrms / (1 + zmed))[useful]))
+    print("Median sig(ln(z)):", np.median((zrms / (1 + zmed))[useful]))
 
     # make another plot showing rms of neighbor cells
     tmp = zmed.reshape(som.shape)
-    tmp2 = np.stack((tmp[:-2, :-2],
-                     tmp[:-2, 1:-1],
-                     tmp[:-2, 2:],
-                     tmp[1:-1, :-2],
-                     tmp[1:-1, 1:-1],
-                     tmp[1:-1, 2:],
-                     tmp[2:, :-2],
-                     tmp[2:, 1:-1],
-                     tmp[2:, 2:]), axis=0)
-    grad = np.std(tmp2, axis=0) / tmp[1:-1, 1:-1] / 2.
-    print('Median neighbor sig(ln(z)):', np.median(grad[~np.isnan(grad)]))
+    tmp2 = np.stack(
+        (
+            tmp[:-2, :-2],
+            tmp[:-2, 1:-1],
+            tmp[:-2, 2:],
+            tmp[1:-1, :-2],
+            tmp[1:-1, 1:-1],
+            tmp[1:-1, 2:],
+            tmp[2:, :-2],
+            tmp[2:, 1:-1],
+            tmp[2:, 2:],
+        ),
+        axis=0,
+    )
+    grad = np.std(tmp2, axis=0) / tmp[1:-1, 1:-1] / 2.0
+    print("Median neighbor sig(ln(z)):", np.median(grad[~np.isnan(grad)]))
     tmp = (zrms / (1 + zmean)).reshape(som.shape)[1:-1, 1:-1] / grad
-    im = ax[1, 1].imshow(tmp, interpolation='nearest', origin='lower', cmap='Spectral', vmin=0, vmax=5)
-    ax[1, 1].set_aspect('equal')
-    ax[1, 1].set_title('stddev / local slope')
+    im = ax[1, 1].imshow(
+        tmp, interpolation="nearest", origin="lower", cmap="Spectral", vmin=0, vmax=5
+    )
+    ax[1, 1].set_aspect("equal")
+    ax[1, 1].set_title("stddev / local slope")
     pl.colorbar(im, ax=ax[1, 1])
 
     return
@@ -848,65 +1001,90 @@ def somDomainColors_withname(som, indexall, nameall, zp=22.5):  # pragma: no cov
     mags = zp - 2.5 * np.log10(som.weights)
     ug = mags[:, index00] - mags[:, index01]
     gi = mags[:, index10] - mags[:, index11]
-    iy = mags[:, index20] - mags[:,index21]
-    imag = mags[:,index3]
+    iy = mags[:, index20] - mags[:, index21]
+    imag = mags[:, index3]
     fig = pl.figure(figsize=(10, 9))
 
     fig, ax = pl.subplots(nrows=2, ncols=2, figsize=(8, 8))
-    im = ax[0, 0].imshow(gi.reshape(som.shape), interpolation='nearest', origin='lower',
-                         cmap='Spectral_r')
-    ax[0, 0].set_title(f'{name00}{name01}')
-    ax[0, 0].set_aspect('equal')
+    im = ax[0, 0].imshow(
+        gi.reshape(som.shape),
+        interpolation="nearest",
+        origin="lower",
+        cmap="Spectral_r",
+    )
+    ax[0, 0].set_title(f"{name00}{name01}")
+    ax[0, 0].set_aspect("equal")
     pl.colorbar(im, ax=ax[0, 0])
 
-    im = ax[1, 0].imshow(ug.reshape(som.shape), interpolation='nearest', origin='lower',
-                         cmap='Spectral_r')
-    ax[1, 0].set_title(f'{name10}{name11}')
-    ax[1, 0].set_aspect('equal')
+    im = ax[1, 0].imshow(
+        ug.reshape(som.shape),
+        interpolation="nearest",
+        origin="lower",
+        cmap="Spectral_r",
+    )
+    ax[1, 0].set_title(f"{name10}{name11}")
+    ax[1, 0].set_aspect("equal")
     pl.colorbar(im, ax=ax[1, 0])
 
-    im = ax[0, 1].imshow(iy.reshape(som.shape), interpolation='nearest', origin='lower',
-                         cmap='Spectral_r')
-    ax[0, 1].set_title(f'{name20}{name21}')
-    ax[0, 1].set_aspect('equal')
+    im = ax[0, 1].imshow(
+        iy.reshape(som.shape),
+        interpolation="nearest",
+        origin="lower",
+        cmap="Spectral_r",
+    )
+    ax[0, 1].set_title(f"{name20}{name21}")
+    ax[0, 1].set_aspect("equal")
     pl.colorbar(im, ax=ax[0, 1])
 
-    im = ax[1, 1].imshow(imag.reshape(som.shape), interpolation='nearest', origin='lower',
-                         cmap='Spectral')
-    ax[1, 1].set_title(f'{name3}mag')
-    ax[1, 1].set_aspect('equal')
+    im = ax[1, 1].imshow(
+        imag.reshape(som.shape),
+        interpolation="nearest",
+        origin="lower",
+        cmap="Spectral",
+    )
+    ax[1, 1].set_title(f"{name3}mag")
+    ax[1, 1].set_aspect("equal")
     pl.colorbar(im, ax=ax[1, 1])
     return
+
 
 def somPlot2d_withname(som, indexall, nameall, zp=22.5):  # pragma: no cover
     [index00, index01], [index10, index11], index2 = indexall
     [name00, name01], [name10, name11], name2 = nameall
     # Make a 2d plot of cells weights in color-color diagram space.
     mags = zp - 2.5 * np.log10(som.weights)
-    #ug = mags[:, 0] - mags[:, 1]
+    # ug = mags[:, 0] - mags[:, 1]
     gi = mags[:, index00] - mags[:, index01]
     ik = mags[:, index10] - mags[:, index11]
     imag = mags[:, index2]
     fig = pl.figure(figsize=(6, 7))
     # First a color-color plot of nodes
-    pl.scatter(gi, ik, c=imag, alpha=0.3, cmap='Spectral')
+    pl.scatter(gi, ik, c=imag, alpha=0.3, cmap="Spectral")
     # Draw the outline of the SOM edges
     xx = np.arange(som.shape[0], dtype=int)
     yy = np.arange(som.shape[1], dtype=int)
-    xxx = np.hstack((xx,
-                     np.ones(len(yy) - 2, dtype=int) * xx[-1],
-                     xx[::-1],
-                     np.zeros(len(yy) - 1, dtype=int)))
-    yyy = np.hstack((np.zeros(len(xx), dtype=int),
-                     yy[1:-1],
-                     np.ones(len(xx) - 1, dtype=int) * yy[-1],
-                     yy[-1::-1]))
+    xxx = np.hstack(
+        (
+            xx,
+            np.ones(len(yy) - 2, dtype=int) * xx[-1],
+            xx[::-1],
+            np.zeros(len(yy) - 1, dtype=int),
+        )
+    )
+    yyy = np.hstack(
+        (
+            np.zeros(len(xx), dtype=int),
+            yy[1:-1],
+            np.ones(len(xx) - 1, dtype=int) * yy[-1],
+            yy[-1::-1],
+        )
+    )
     ii = np.ravel_multi_index((xxx, yyy), som.shape)
-    pl.plot(gi[ii], ik[ii], 'k-')
-    pl.title('Node locations')
-    pl.gca().set_aspect('equal')
+    pl.plot(gi[ii], ik[ii], "k-")
+    pl.title("Node locations")
+    pl.gca().set_aspect("equal")
     cb = pl.colorbar()
-    cb.set_label('imag')
-    pl.xlabel('gi')
-    pl.ylabel('ik')
+    cb.set_label("imag")
+    pl.xlabel("gi")
+    pl.ylabel("ik")
     return

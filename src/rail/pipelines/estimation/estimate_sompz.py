@@ -1,10 +1,15 @@
+from rail.core.stage import RailPipeline, RailStage
 from rail.utils.catalog_utils import CatalogConfigBase
-from rail.core.stage import RailStage, RailPipeline
 
-from rail.estimation.algos.sompz import SOMPZEstimatorWide, SOMPZEstimatorDeep
-from rail.estimation.algos.sompz import SOMPZPzc, SOMPZPzchat, SOMPZPc_chat
-from rail.estimation.algos.sompz import SOMPZTomobin, SOMPZnz
-
+from rail.estimation.algos.sompz import (
+    SOMPZEstimatorDeep,
+    SOMPZEstimatorWide,
+    SOMPZnz,
+    SOMPZPc_chat,
+    SOMPZPzc,
+    SOMPZPzchat,
+    SOMPZTomobin,
+)
 
 bin_edges_deep = [0.0, 0.5, 1.0, 2.0, 3.0]
 zbins_min_deep = 0.0

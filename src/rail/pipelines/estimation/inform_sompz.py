@@ -1,4 +1,4 @@
-from rail.core.stage import RailStage, RailPipeline
+from rail.core.stage import RailPipeline, RailStage
 from rail.utils.catalog_utils import CatalogConfigBase
 
 from rail.estimation.algos.sompz import SOMPZInformer

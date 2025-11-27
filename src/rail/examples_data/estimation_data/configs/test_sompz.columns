@@ -11,4 +11,3 @@ DC2LSST_y      mag_y_lsst, mag_err_y_lsst	AB			  0.005	    0.0
 Z_S 	       redshift
 ID		id
 M_0		mag_i_lsst
-

@@ -1,33 +1,32 @@
-import numpy as np
-import os
-import sys
 import glob
+import os
 import pickle
+import sys
+
+import numpy as np
 import pytest
-import yaml
+import scipy.special
 import tables_io
-from rail.core.stage import RailStage
+import yaml
 from rail.core.data import DataStore, TableHandle
+from rail.core.stage import RailStage
 from rail.utils.path_utils import RAILDIR
 from rail.utils.testing_utils import one_algo
+
 from rail.estimation.algos import sompz
 from rail.sompz.utils import RAIL_SOMPZ_DIR
 
-import scipy.special
-sci_ver_str = scipy.__version__.split('.')
+sci_ver_str = scipy.__version__.split(".")
 
 parquetdata = "./tests/validation_10gal.pq"
-traindata = os.path.join(RAILDIR, 'rail/examples_data/testdata/training_100gal.hdf5')
-validdata = os.path.join(RAILDIR, 'rail/examples_data/testdata/validation_10gal.hdf5')
+traindata = os.path.join(RAILDIR, "rail/examples_data/testdata/training_100gal.hdf5")
+validdata = os.path.join(RAILDIR, "rail/examples_data/testdata/validation_10gal.hdf5")
 
 DS = RailStage.data_store
 DS.__class__.allow_overwrite = True
 
 
-@pytest.mark.parametrize(
-    "ntarray",
-    [[8], [4, 4]]
-)
+@pytest.mark.parametrize("ntarray", [[8], [4, 4]])
 def test_sompz_train(ntarray):
     """
     # first, train with two broad types
@@ -55,11 +54,7 @@ def test_sompz_train(ntarray):
 
 
 @pytest.mark.parametrize(
-    "inputdata, groupname",
-    [
-        (parquetdata, ""),
-        (validdata, "photometry")
-    ]
+    "inputdata, groupname", [(parquetdata, ""), (validdata, "photometry")]
 )
 def test_sompz(inputdata, groupname):
     """

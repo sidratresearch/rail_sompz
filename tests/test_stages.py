@@ -1,18 +1,17 @@
-from rail.core.stage import RailStage
 from rail.core.data import Hdf5Handle
+from rail.core.stage import RailStage
 from rail.utils.catalog_utils import CatalogConfigBase
 
 from rail.estimation.algos.sompz import (
-    SOMPZInformer,
-    SOMPZEstimatorWide,
     SOMPZEstimatorDeep,
-    SOMPZPzc,
+    SOMPZEstimatorWide,
+    SOMPZInformer,
+    SOMPZnz,
     SOMPZPc_chat,
+    SOMPZPzc,
     SOMPZPzchat,
     SOMPZTomobin,
-    SOMPZnz,
 )
-
 
 deep_catalog_tag: str = "SompzDeepTestCatalogConfig"
 catalog_module: str = "rail.sompz.utils"
