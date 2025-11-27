@@ -510,6 +510,7 @@ class SOMPZInformer(CatInformer):
     """Inform stage for SOMPZEstimator"""
 
     name = "SOMPZInformer"
+    entrypoint_function = "inform"  # the user-facing science function for this class
     config_options = CatInformer.config_options.copy()
     config_options.update(
         redshift_col=SHARED_PARAMS,
@@ -652,6 +653,7 @@ class SOMPZEstimator(CatEstimator):  # pragma: no cover
     """CatEstimator subclass to compute redshift PDFs for SOMPZ"""
 
     name = "SOMPZEstimator"
+    entrypoint_function = "estimate"  # the user-facing science function for this class
     config_options = CatEstimator.config_options.copy()
     config_options.update(
         redshift_col=SHARED_PARAMS,
@@ -1332,6 +1334,7 @@ class SOMPZPzc(CatEstimator):
     """Calcaulate pzc"""
 
     name = "SOMPZPzc"
+    entrypoint_function = "estimate"  # the user-facing science function for this class
     config_options = CatEstimator.config_options.copy()
     config_options.update(
         inputs=Param(
@@ -1398,6 +1401,7 @@ class SOMPZPzchat(CatEstimator):
     """Calcaulate pzchat"""
 
     name = "SOMPZPzchat"
+    entrypoint_function = "estimate"  # the user-facing science function for this class
     config_options = CatEstimator.config_options.copy()
     config_options.update(
         inputs=Param(
@@ -1480,6 +1484,7 @@ class SOMPZPc_chat(CatEstimator):
     """Calcaulate p(c|chat)"""
 
     name = "SOMPZPc_chat"
+    entrypoint_function = "estimate"  # the user-facing science function for this class
     config_options = CatEstimator.config_options.copy()
     config_options.update(
         inputs=Param(
@@ -1525,6 +1530,7 @@ class SOMPZTomobin(CatEstimator):
     """Calcaulate tomobin"""
 
     name = "SOMPZTomobin"
+    entrypoint_function = "estimate"  # the user-facing science function for this class
     config_options = CatEstimator.config_options.copy()
     config_options.update(
         inputs=Param(
@@ -1596,6 +1602,7 @@ class SOMPZnz(CatEstimator):
     """Calcaulate nz"""
 
     name = "SOMPZnz"
+    entrypoint_function = "estimate"  # the user-facing science function for this class
     config_options = CatEstimator.config_options.copy()
     config_options.update(
         inputs=Param(
@@ -1690,6 +1697,7 @@ class SOMPZEstimatorBase(CatEstimator):
     """CatEstimator subclass to compute redshift PDFs for SOMPZ"""
 
     name = "SOMPZEstimatorBase"
+    entrypoint_function = "estimate"  # the user-facing science function for this class
     config_options = CatEstimator.config_options.copy()
     config_options.update(
         chunk_size=SHARED_PARAMS,
@@ -1897,6 +1905,7 @@ class SOMPZEstimatorWide(SOMPZEstimatorBase):
     """CatEstimator subclass to compute redshift PDFs for SOMPZ"""
 
     name = "SOMPZEstimatorWide"
+    entrypoint_function = "estimate"  # the user-facing science function for this class
 
     inputs = [
         ("wide_model", ModelHandle),
@@ -1938,6 +1947,7 @@ class SOMPZEstimatorDeep(SOMPZEstimatorBase):
     """CatEstimator subclass to compute redshift PDFs for SOMPZ"""
 
     name = "SOMPZEstimatorDeep"
+    entrypoint_function = "estimate"  # the user-facing science function for this class
     inputs = [
         ("deep_model", ModelHandle),
         ("data", TableHandle),
