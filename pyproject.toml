@@ -1,10 +1,8 @@
 [project]
 name = "pz-rail-sompz"
-license = {file = "LICENSE"}
+license = { file = "LICENSE" }
 readme = "README.md"
-authors = [
-    { name = "LSST DESC PZ WG", email = "samuel.j.schmidt@gmail.com" }
-]
+authors = [{ name = "LSST DESC PZ WG", email = "samuel.j.schmidt@gmail.com" }]
 classifiers = [
     "Development Status :: 4 - Beta",
     "License :: OSI Approved :: MIT License",
@@ -15,12 +13,7 @@ classifiers = [
 ]
 dynamic = ["version"]
 
-dependencies = [
-    "numba",
-    "pz-rail-base>=1.0.3",
-    "qp-prob[full]",
-    "tqdm",
-]
+dependencies = ["numba", "pz-rail-base>=1.0.3", "qp-prob[full]", "tqdm"]
 
 # On a mac, install optional dependencies with `pip install '.[dev]'` (include the single quotes)
 [project.optional-dependencies]
@@ -28,12 +21,12 @@ dev = [
     "pytest",
     "pytest-cov", # Used to report total code coverage
     "pre-commit", # Used to run checks before finalizing a git commit
-    "pylint", # Used for static linting of files
+    "pylint",     # Used for static linting of files
 ]
 
 [build-system]
 requires = [
-    "setuptools>=62", # Used to build and package the Python project
+    "setuptools>=62",      # Used to build and package the Python project
     "wheel",
     "setuptools_scm>=6.2", # Gets release version from git. Makes it available programmatically
 ]
@@ -51,13 +44,8 @@ include = ["rail"]
 namespaces = true
 
 [tool.pytest.ini_options]
-testpaths = [
-    "tests",
-]
-addopts = [
-    "--cov=rail",
-    "--cov-report=html"
-]
+testpaths = ["tests"]
+addopts   = ["--cov=rail", "--cov-report=html"]
 
 [tool.pylint]
 disable = [
