@@ -35,13 +35,13 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools_scm]
 write_to = "src/rail/sompz/_version.py"
 
-[tool.setuptools.package-data]
+[tool.tools.package-data]
 "rail.examples.estimation.configs" = ["*.columns"]
 
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["rail"]
-namespaces = true
+# [tool.setuptools.packages.find]
+# where = ["."]
+# include = ["rail"]
+# namespaces = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
