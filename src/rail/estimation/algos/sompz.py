@@ -14,7 +14,7 @@ import pandas as pd
 import qp
 from ceci.config import StageParameter as Param
 from rail.core.common_params import SHARED_PARAMS
-from rail.core.data import Hdf5Handle, ModelHandle, QPHandle, TableHandle
+from rail.core.data import Hdf5Handle, ModelHandle, QPHandle, TableHandle, TableLike
 from rail.estimation.estimator import CatEstimator, CatInformer
 
 import rail.estimation.algos.som as somfuncs
@@ -511,6 +511,7 @@ class SOMPZInformer(CatInformer):
 
     name = "SOMPZInformer"
     entrypoint_function = "inform"  # the user-facing science function for this class
+    interactive_function = "sompz_informer"
     config_options = CatInformer.config_options.copy()
     config_options.update(
         redshift_col=SHARED_PARAMS,
@@ -642,7 +643,20 @@ class SOMPZInformer(CatInformer):
         )
         self.add_data("model", model)
 
-    def inform(self, input_data):
+    def inform(self, input_data, **kwargs) -> None:
+        """
+        Inform description
+
+        Parameters
+        ----------
+        input_data : Any
+            description
+
+        Returns
+        -------
+        None
+            self.model looks like it's never set
+        """
         self.set_data("input_data", input_data)
         self.run()
         self.finalize()
@@ -654,6 +668,7 @@ class SOMPZEstimator(CatEstimator):  # pragma: no cover
 
     name = "SOMPZEstimator"
     entrypoint_function = "estimate"  # the user-facing science function for this class
+    interactive_function = "sompz_estimator"
     config_options = CatEstimator.config_options.copy()
     config_options.update(
         redshift_col=SHARED_PARAMS,
@@ -1316,12 +1331,18 @@ class SOMPZEstimator(CatEstimator):  # pragma: no cover
         pzcdict = dict(pz_c=pz_c)
         self.add_data("pz_c", pzcdict)  # wide_data_cells_wide)
 
-    def estimate(
-        self,
-        spec_data,
-        balrog_data,
-        wide_data,
-    ):
+    def estimate(self, spec_data, balrog_data, wide_data, **kwargs) -> None:
+        """Estimate description
+
+        Parameters
+        ----------
+        spec_data : Any
+            description
+        balrog_data : Any
+            description
+        wide_data : Any
+            description
+        """
         self.set_data("spec_data", spec_data)
         self.set_data("balrog_data", balrog_data)
         self.set_data("wide_data", wide_data)
@@ -1335,6 +1356,7 @@ class SOMPZPzc(CatEstimator):
 
     name = "SOMPZPzc"
     entrypoint_function = "estimate"  # the user-facing science function for this class
+    interactive_function = "sompz_pzc"
     config_options = CatEstimator.config_options.copy()
     config_options.update(
         inputs=Param(
@@ -1390,7 +1412,16 @@ class SOMPZPzc(CatEstimator):
         pzcdict = dict(pz_c=pz_c)
         self.add_data("pz_c", pzcdict)
 
-    def estimate(self, spec_data, cell_deep_spec_data):
+    def estimate(self, spec_data, cell_deep_spec_data, **kwargs) -> None:
+        """Estimate description
+
+        Parameters
+        ----------
+        spec_data : Any
+            description
+        cell_deep_spec_data : Any
+            description
+        """
         spec_data = self.set_data("spec_data", spec_data)
         cell_deep_spec_data = self.set_data("cell_deep_spec_data", cell_deep_spec_data)
         self.run()
@@ -1402,6 +1433,7 @@ class SOMPZPzchat(CatEstimator):
 
     name = "SOMPZPzchat"
     entrypoint_function = "estimate"  # the user-facing science function for this class
+    interactive_function = "sompz_pzchat"
     config_options = CatEstimator.config_options.copy()
     config_options.update(
         inputs=Param(
@@ -1469,8 +1501,29 @@ class SOMPZPzchat(CatEstimator):
         self.add_data("pz_chat", pzchatdict)
 
     def estimate(
-        self, spec_data, cell_deep_spec_data, cell_wide_wide_data, pz_c, pc_chat
-    ):
+        self,
+        spec_data,
+        cell_deep_spec_data,
+        cell_wide_wide_data,
+        pz_c,
+        pc_chat,
+        **kwargs,
+    ) -> None:
+        """Estimate description
+
+        Parameters
+        ----------
+        spec_data : Any
+            description
+        cell_deep_spec_data : Any
+            description
+        cell_wide_wide_data : Any
+            description
+        pz_c : Any
+            description
+        pc_chat : Any
+            description
+        """
         self.set_data("spec_data", spec_data)
         self.set_data("cell_deep_spec_data", cell_deep_spec_data)
         self.set_data("cell_wide_wide_data", cell_wide_wide_data)
@@ -1485,6 +1538,7 @@ class SOMPZPc_chat(CatEstimator):
 
     name = "SOMPZPc_chat"
     entrypoint_function = "estimate"  # the user-facing science function for this class
+    interactive_function = "sompz_p_c_chat"
     config_options = CatEstimator.config_options.copy()
     config_options.update(
         inputs=Param(
@@ -1519,7 +1573,16 @@ class SOMPZPc_chat(CatEstimator):
         pcchatdict = dict(pc_chat=pc_chat)
         self.add_data("pc_chat", pcchatdict)
 
-    def estimate(self, cell_deep_balrog_data, cell_wide_balrog_data):
+    def estimate(self, cell_deep_balrog_data, cell_wide_balrog_data, **kwargs) -> None:
+        """Estimate description
+
+        Parameters
+        ----------
+        cell_deep_balrog_data : Any
+            description
+        cell_wide_balrog_data : Any
+            description
+        """
         self.set_data("cell_deep_balrog_data", cell_deep_balrog_data)
         self.set_data("cell_wide_balrog_data", cell_wide_balrog_data)
         self.run()
@@ -1531,6 +1594,7 @@ class SOMPZTomobin(CatEstimator):
 
     name = "SOMPZTomobin"
     entrypoint_function = "estimate"  # the user-facing science function for this class
+    interactive_function = "sompz_tomobin"
     config_options = CatEstimator.config_options.copy()
     config_options.update(
         inputs=Param(
@@ -1590,7 +1654,20 @@ class SOMPZTomobin(CatEstimator):
 
         self.add_data("tomo_bins_wide", dict(tomo_bins_wide=tomobinsmapping))
 
-    def estimate(self, spec_data, cell_deep_spec_data, cell_wide_spec_data):
+    def estimate(
+        self, spec_data, cell_deep_spec_data, cell_wide_spec_data, **kwargs
+    ) -> None:
+        """Estimate description
+
+        Parameters
+        ----------
+        spec_data : Any
+            description
+        cell_deep_spec_data : Any
+            description
+        cell_wide_spec_data : Any
+            description
+        """
         self.set_data("spec_data", spec_data)
         self.set_data("cell_deep_spec_data", cell_deep_spec_data)
         self.set_data("cell_wide_spec_data", cell_wide_spec_data)
@@ -1603,6 +1680,7 @@ class SOMPZnz(CatEstimator):
 
     name = "SOMPZnz"
     entrypoint_function = "estimate"  # the user-facing science function for this class
+    interactive_function = "sompz_nz"
     config_options = CatEstimator.config_options.copy()
     config_options.update(
         inputs=Param(
@@ -1683,7 +1761,23 @@ class SOMPZnz(CatEstimator):
         cell_wide_wide_data,
         tomo_bins_wide,
         pc_chat,
-    ):
+        **kwargs,
+    ) -> None:
+        """Estimate description
+
+        Parameters
+        ----------
+        spec_data : Any
+            description
+        cell_deep_spec_data : Any
+            description
+        cell_wide_wide_data : Any
+            description
+        tomo_bins_wide : Any
+            description
+        pc_chat : Any
+            description
+        """
         spec_data = self.set_data("spec_data", spec_data)
         cell_deep_spec_data = self.set_data("cell_deep_spec_data", cell_deep_spec_data)
         cell_wide_wide_data = self.set_data("cell_wide_wide_data", cell_wide_wide_data)
@@ -1698,6 +1792,7 @@ class SOMPZEstimatorBase(CatEstimator):
 
     name = "SOMPZEstimatorBase"
     entrypoint_function = "estimate"  # the user-facing science function for this class
+    interactive_function = "sompz_estimator_base"
     config_options = CatEstimator.config_options.copy()
     config_options.update(
         chunk_size=SHARED_PARAMS,
@@ -1884,7 +1979,14 @@ class SOMPZEstimatorBase(CatEstimator):
             self.comm.Barrier()
         self._finalize_run()
 
-    def estimate(self, data):
+    def estimate(self, data, **kwargs) -> None:
+        """Estimate description
+
+        Parameters
+        ----------
+        data : Any
+            description
+        """
         self.set_data("data", data)
         self.run()
         self.finalize()
@@ -1906,6 +2008,7 @@ class SOMPZEstimatorWide(SOMPZEstimatorBase):
 
     name = "SOMPZEstimatorWide"
     entrypoint_function = "estimate"  # the user-facing science function for this class
+    interactive_function = "sompz_estimator_wide"
 
     inputs = [
         ("wide_model", ModelHandle),
@@ -1948,6 +2051,7 @@ class SOMPZEstimatorDeep(SOMPZEstimatorBase):
 
     name = "SOMPZEstimatorDeep"
     entrypoint_function = "estimate"  # the user-facing science function for this class
+    interactive_function = "sompz_estimator_deep"
     inputs = [
         ("deep_model", ModelHandle),
         ("data", TableHandle),
