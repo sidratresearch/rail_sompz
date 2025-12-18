@@ -13,7 +13,7 @@ classifiers = [
 ]
 dynamic = ["version"]
 
-dependencies = ["numba", "pz-rail-base>=2.0.0", "qp-prob[full]", "tqdm"]
+dependencies = ["numba", "pz-rail-base>=2.0.0-dev", "qp-prob[full]", "tqdm"]
 
 # On a mac, install optional dependencies with `pip install '.[dev]'` (include the single quotes)
 [project.optional-dependencies]
